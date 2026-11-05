@@ -1,0 +1,42 @@
+server:
+  port: ${USER_SERVICE_PORT:8082}
+  forward-headers-strategy: framework
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/user_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+      accept-float-as-int: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 10000
+        max.block.ms: 5000
+springdoc:
+  paths-to-match: /api/users/**
+  override-with-generic-response: false
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+logging:
+  level:
+    com.aston.userservice: INFO
+app:
+  kafka:
+    topic: ${KAFKA_TOPIC:user-events}
+  outbox:
+    delay-ms: 2000

@@ -1,0 +1,229 @@
+name: user-platform
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-user_db}
+      POSTGRES_USER: ${POSTGRES_USER:-user_service}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_training_password}
+    volumes:
+    - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  kafka:
+    image: apache/kafka:3.9.1
+    restart: unless-stopped
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    volumes:
+    - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 30s
+  mailpit:
+    image: axllent/mailpit:v1.22.3
+    restart: unless-stopped
+    environment:
+      MP_SMTP_BIND_ADDR: 0.0.0.0:1025
+      MP_DATABASE: /data/mailpit.db
+    ports:
+    - 127.0.0.1:${MAILPIT_HOST_PORT:-8025}:8025
+    volumes:
+    - mailpit-data:/data
+    healthcheck:
+      test:
+      - CMD
+      - /mailpit
+      - readyz
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  config-server:
+    build:
+      context: .
+      args:
+        MODULE: config-server
+    image: user-platform/config-server:local
+    restart: unless-stopped
+    environment:
+      CONFIG_REPO_LOCATION: file:/config-repo/
+      APP_PORT: '8888'
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:$${APP_PORT}/actuator/health > /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+    volumes:
+    - ./config-repo:/config-repo:ro
+    ports:
+    - 127.0.0.1:${CONFIG_HOST_PORT:-8888}:8888
+  discovery-server:
+    build:
+      context: .
+      args:
+        MODULE: discovery-server
+    image: user-platform/discovery-server:local
+    restart: unless-stopped
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      SERVICE_HOST: discovery-server
+      APP_PORT: '8761'
+    depends_on:
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:$${APP_PORT}/actuator/health > /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+    ports:
+    - 127.0.0.1:${EUREKA_HOST_PORT:-8761}:8761
+  user-service:
+    build:
+      context: .
+      args:
+        MODULE: user-service
+    image: user-platform/user-service:local
+    restart: unless-stopped
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      SERVICE_HOST: user-service
+      APP_PORT: '8082'
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-user_db}
+      DB_USERNAME: ${POSTGRES_USER:-user_service}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-local_training_password}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:$${APP_PORT}/actuator/health > /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+  notification-service:
+    build:
+      context: .
+      args:
+        MODULE: notification-service
+    image: user-platform/notification-service:local
+    restart: unless-stopped
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      SERVICE_HOST: notification-service
+      APP_PORT: '8081'
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MAIL_HOST: mailpit
+      MAIL_PORT: '1025'
+      SITE_NAME: ${SITE_NAME:-ваш сайт}
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:$${APP_PORT}/actuator/health > /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+  api-gateway:
+    build:
+      context: .
+      args:
+        MODULE: api-gateway
+    image: user-platform/api-gateway:local
+    restart: unless-stopped
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://discovery-server:8761/eureka/
+      SERVICE_HOST: api-gateway
+      APP_PORT: '8080'
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://localhost:$${APP_PORT}/actuator/health > /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
+    ports:
+    - 127.0.0.1:${GATEWAY_HOST_PORT:-8080}:8080
+  smoke-test:
+    image: python:3.12-alpine
+    profiles:
+    - test
+    volumes:
+    - ./scripts:/tests:ro
+    command:
+    - python
+    - /tests/smoke_test.py
+    environment:
+      SITE_NAME: ${SITE_NAME:-ваш сайт}
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+volumes:
+  postgres-data: {}
+  kafka-data: {}
+  mailpit-data: {}

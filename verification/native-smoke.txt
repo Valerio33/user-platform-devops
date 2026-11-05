@@ -1,0 +1,19 @@
+READY Kafka KRaft
+READY config-server
+READY discovery-server
+READY user-service
+READY notification-service
+READY api-gateway
+PASS: Eureka: user-service
+PASS: Eureka: notification-service
+PASS: Eureka: api-gateway
+PASS: external configuration for all clients
+PASS: Gateway route ready
+PASS: Swagger through Gateway
+PASS: create/read, UTF-8, HATEOAS and Location
+PASS: CREATED: DB -> outbox -> Kafka -> notification -> SMTP
+PASS: DELETED: DB -> outbox -> Kafka -> notification -> SMTP
+PASS: notification route ready
+PASS: notification REST API through Gateway -> SMTP
+SMOKE TEST PASSED
+NATIVE END-TO-END PASSED (not Docker)

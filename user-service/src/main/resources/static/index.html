@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Service — пользователи</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div><p class="eyebrow">USER SERVICE</p><h1>Пользователи</h1><p class="muted">Создавайте и редактируйте записи в одном месте.</p></div>
+      <div class="header-tools">
+        <div id="api-status" class="api-status checking" role="status" aria-live="polite">Проверяем API…</div>
+        <span id="api-checked" class="hint">Проверка каждые 30 секунд</span>
+        <button type="button" id="refresh" class="secondary">Обновить список</button>
+        <a href="/swagger-ui.html" target="_blank" rel="noopener">Swagger API</a>
+      </div>
+    </header>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section class="stats" aria-label="Статистика пользователей">
+      <div class="stat"><span>Всего пользователей</span><strong id="total-count">—</strong></div>
+      <div class="stat"><span>Найдено по запросу</span><strong id="filtered-count">—</strong></div>
+    </section>
+    <div class="layout">
+      <section class="card editor" aria-labelledby="form-title">
+        <p class="eyebrow" id="form-mode">НОВАЯ ЗАПИСЬ</p>
+        <h2 id="form-title">Добавить пользователя</h2>
+        <form id="user-form">
+          <label for="name">Имя</label>
+          <input id="name" name="name" maxlength="100" autocomplete="name" required placeholder="Иван Иванов">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" maxlength="254" autocomplete="email" required placeholder="ivan@example.com">
+          <label for="age">Возраст</label>
+          <input id="age" name="age" type="number" min="0" max="150" step="1" required placeholder="25">
+          <p class="hint">Все поля обязательны. Email должен быть уникальным.</p>
+          <button id="save" class="primary" type="submit">Создать пользователя</button>
+          <button id="cancel" class="secondary" type="button" hidden>Отменить редактирование</button>
+        </form>
+      </section>
+      <section class="card list" aria-labelledby="list-title">
+        <div class="list-heading"><h2 id="list-title">Все пользователи</h2><span id="count" class="badge">—</span></div>
+        <label for="search">Поиск пользователей</label>
+        <div class="search-row">
+          <input type="search" id="search" placeholder="Имя, email или точный ID" autocomplete="off" aria-controls="users">
+          <button type="button" id="clear-search" class="secondary">Сбросить</button>
+        </div>
+        <p class="hint">Поиск по загруженному списку, без учёта регистра.</p>
+        <p id="list-state" class="empty">Загружаем пользователей…</p>
+        <div class="table-wrap" id="table-wrap" hidden>
+          <table><thead><tr><th>ID</th><th>Пользователь</th><th>Возраст</th><th>Создан</th><th><span class="sr-only">Действия</span></th></tr></thead><tbody id="users"></tbody></table>
+        </div>
+      </section>
+    </div>
+    <footer>Изменения сохраняются в базе данных после нажатия кнопки.</footer>
+  </main>
+</body>
+</html>
